@@ -1,0 +1,210 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% Task A%%%%%%%%%%%%%%%%%%%%%
+function [posterior_tests] = get_posterior(tests)
+
+keySet = {':(',':)','+|:(','-|:(','+|:)','-|:)'}; %Prior,hit rate,false alarm
+valueSet = [0.001 1-0.001 0.99 1-0.99 0.05 1-0.05];
+P= containers.Map(keySet,valueSet);
+prior=[P(':(') P(':)')];
+for l=1:1:length(tests)
+    
+    likelihood=[P(strcat(tests(l),'|:(')) P(strcat(tests(l),'|:)'))];
+    posterior=likelihood.*prior./sum(likelihood.*prior);    
+    posterior_tests(l,:)=posterior; %have disease, not have disease
+    prior= posterior;
+end
+
+if length(tests)==0
+    posterior_tests=prior;
+end
+
+end
+
+%%%main matlab file
+
+clc;clear all;close all;
+ tests=['+' '+' '+' '+' '+'];
+%  tests='';
+posterior_tests=get_posterior(tests);
+text_have='P[:(|';
+text_not_have='P[:)|';
+
+for l=1:1:length(tests)
+  text_have=strcat(text_have,tests(l));
+  text_not_have=strcat(text_not_have,tests(l));  
+  fprintf('%s]=%0.20f         ',text_have,posterior_tests(l,1));
+  fprintf('%s]=%0.20f\n',text_not_have,posterior_tests(l,2));
+end
+
+if length(tests)==0
+    fprintf('%s]=%0.5f         ',text_have,posterior_tests(1,1));
+    fprintf('%s]=%0.5f\n',text_not_have,posterior_tests(1,2));
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%Task B%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%
+function [p] = bern(y,theta)
+p=theta.^(y).*(1-theta).^(1-y);
+end
+%%%
+function [likeli] = likelihood(toss,theta)
+likeli=1;
+for l=1:1:length(toss)
+    likeli=likeli*bern(toss(l),theta);
+end
+end
+%%%
+function [p] = logbern(y,theta)
+p=log(theta.^(y))+log((1-theta).^(1-y));
+end
+%%
+function [likeli] = loglikelihood(toss,theta)
+likeli=0;
+for l=1:1:length(toss)
+    likeli=likeli+logbern(toss(l),theta);
+end
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%Main Matlab File%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+clc;clear all;close all;
+%Task B-1,2
+y=[0,1];
+theta=[0.25,0.5];
+for m=1:1:length(theta)
+    for l=1:1:length(y)
+        p(m,l)=bern(y(l),theta(m)); 
+    end
+end
+figure(1)
+stem(y,p(1,:),'linewidth',2);
+title('Bernouli distribution for theta=0.25')
+grid on;xlim([-0.05 1.05]);ylim([0 1]);
+
+figure(2)
+stem(y,p(2,:),'linewidth',2);
+title('Bernouli distribution for theta=0.5')
+grid on;xlim([-0.05 1.05]); ylim([0 1])
+
+%Task B-3
+theta=0:0.01:1;
+for m=1:1:length(y)
+    for l=1:1:length(theta)
+    p(m,l)=bern(y(m),theta(l));
+    end
+end
+
+figure(3)
+plot(theta,p(1,:),'linewidth',2);
+title('P(y=0|theta)')
+grid on; xlim([-0.05 1.05]);ylim([0 1.05]);
+figure(4)
+plot(theta,p(2,:),'linewidth',2);
+title('P(y=1|theta)')
+grid on; xlim([-0.05 1.05]); ylim([0 1.05]);
+
+%Task B 4-a
+iteraions=[10 1000 100000];
+for m=1:1:length(iteraions)
+    toss=zeros(1,iteraions(m));
+    random_fraction=rand(1,iteraions(m));
+for l=1:iteraions(m)
+    if random_fraction(l)<0.5
+        toss(l)=1;    
+    else
+        toss(l)=0;
+    end
+end
+    likeli(m)=likelihood(toss,0.5);
+    loglikeli(m)=loglikelihood(toss,0.5);
+    fprintf('n=%d,P({y}|theta=0.5)=%0.20f\n\n',iteraions(m),likeli(m));
+end
+
+%Task B 4)b
+
+fprintf('Log-likelihood\n');
+for m=1:1:length(iteraions)
+    fprintf('n=%d,logP({y}|theta=0.5)=%f\n\n',iteraions(m),loglikeli(m));
+end
+
+%Task B 4)c
+
+fprintf('Likelihood from log-likelihood\n');
+for m=1:1:length(iteraions)
+    fprintf('n=%d,logP({y}|theta=0.5)=%0.20f\n\n',iteraions(m),exp(loglikeli(m)));
+end
+
+
+%4)Task B-4-d
+y1=1;y2=[1 1];y3=[1 1 0 1];
+for l=1:1:length(theta)
+    likeli(1,l)=likelihood(y1,theta(l));
+    likeli(2,l)=likelihood(y2,theta(l));
+    likeli(3,l)=likelihood(y3,theta(l));
+end
+figure(5)
+plot(theta,likeli(1,:),theta,likeli(2,:),theta,likeli(3,:));
+grid on;xlabel('theta');ylabel('p(y|theta)');title('Likelihood function')
+legend('y1=1','y2=[1 1]','y3=[1 1 0 1]');
+
+%Task B-5-i
+a=1;b=1;
+pd_prior = makedist('Beta','a',a,'b',b);
+prior_theta = pdf(pd_prior,theta);
+% prior_theta2=(theta.^(a-1).*(1-theta).^(b-1)); %using the equation
+% prior_theta2=prior_theta2./beta(a,b);
+figure(6)
+plot(theta,prior_theta);
+grid on;title('Proior distribution=beta(theta|a=1,b=1)');
+
+%5-b)-ii postetior dist
+
+pd_post_y1 = makedist('Beta','a',sum(y1)+a,'b',length(y1)-sum(y1)+b);
+post_y1 = pdf(pd_post_y1,theta);
+post_y1_log=log(post_y1);
+pd_post_y2 = makedist('Beta','a',sum(y2)+a,'b',length(y2)-sum(y2)+b);
+post_y2 = pdf(pd_post_y2,theta);
+post_y2_log=log(post_y2);
+pd_post_y3 = makedist('Beta','a',sum(y3)+a,'b',length(y3)-sum(y3)+b);
+post_y3 = pdf(pd_post_y3,theta);
+post_y3_log=log(post_y3);
+figure(8)
+plot(theta,post_y1,theta,post_y2,theta,post_y3)
+grid on;xlabel('theta');ylabel('p(y|theta)');title('Posterior function')
+legend('y1=1','y2=[1 1]','y3=[1 1 0 1]');
+figure(9)
+plot(theta,post_y1_log,theta,post_y2_log,theta,post_y3_log);
+grid on; xlabel('theta');ylabel('p(y|theta)');title('Log-Posterior function')
+legend('y1=1','y2=[1 1]','y3=[1 1 0 1]');
+
+
+%5-b-iii
+a=[200 18.25 1];
+b=[200 6.75 1];
+for l=1:1:length(a)
+pd_prior = makedist('Beta','a',a(l),'b',b(l));
+prior_theta = pdf(pd_prior,theta);subplot(3,3,l);
+plot(theta,prior_theta);title('Prior(beta)');
+end
+
+data=[ones(1,17) zeros(1,3)];
+for l=1:1:length(theta)  
+    likelih(l)=likelihood(data,theta(l));
+    
+end
+subplot(3,3,4);
+plot(theta,likelih);title('Likelihood (Bernoulli)')
+subplot(3,3,5);
+plot(theta,likelih);title('Likelihood (Bernoulli)')
+subplot(3,3,6);
+plot(theta,likelih);title('Likelihood (Bernoulli)')
+
+for l=1:1:length(a)
+pd_post = makedist('Beta','a',sum(data)+a(l),'b',length(data)-sum(data)+b(l));
+post = pdf(pd_post,theta);
+subplot(3,3,6+l);
+plot(theta,post);title('Posterior(beta)');
+end
+
+
+
+
